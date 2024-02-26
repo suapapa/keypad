@@ -18,8 +18,8 @@ features = ["example_generated"]
 rustdoc-args = ["--cfg", "docs_rs_workaround"]
 
 [dependencies.embedded-hal]
-features = ["unproven"]
-version = "0.2.7"
+# features = ["unproven"]
+version = "1.0.0"
 
 [features]
 example_generated = []

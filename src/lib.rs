@@ -58,7 +58,7 @@
 //! extern crate keypad;
 //!
 //! use core::convert::Infallible;
-//! use keypad::embedded_hal::digital::v2::InputPin;
+//! use keypad::embedded_hal::digital::InputPin;
 //! use keypad::mock_hal::{self, GpioExt, Input, OpenDrain, Output, PullUp, GPIOA};
 //!
 //! // Define the struct that represents your keypad matrix circuit,
@@ -143,7 +143,7 @@ pub extern crate core as _core;
 pub mod mock_hal;
 
 use core::cell::RefCell;
-use embedded_hal::digital::v2::{InputPin, OutputPin};
+use embedded_hal::digital::{ErrorType, InputPin, OutputPin};
 
 /// A virtual `embedded-hal` input pin representing one key of the keypad.
 ///
@@ -164,31 +164,34 @@ use embedded_hal::digital::v2::{InputPin, OutputPin};
 /// 2) Reading from a `KeypadInput` is slower than reading from a real input
 /// pin, because it needs to change the output pin state twice for every read.
 pub struct KeypadInput<'a, E> {
-    row: &'a dyn InputPin<Error = E>,
+    row: &'a RefCell<dyn InputPin<Error = E>>,
     col: &'a RefCell<dyn OutputPin<Error = E>>,
 }
 
 impl<'a, E> KeypadInput<'a, E> {
     /// Create a new `KeypadInput`. For use in macros.
     pub fn new(
-        row: &'a dyn InputPin<Error = E>,
+        row: &'a RefCell<dyn InputPin<Error = E>>,
         col: &'a RefCell<dyn OutputPin<Error = E>>,
     ) -> Self {
         Self { row, col }
     }
 }
 
-impl<'a, E> InputPin for KeypadInput<'a, E> {
+impl<'a, E: embedded_hal::digital::Error> ErrorType for KeypadInput<'a, E> {
     type Error = E;
+}
+
+impl<'a, E: embedded_hal::digital::Error> InputPin for KeypadInput<'a, E> {
     /// Read the state of the key at this row and column. Not reentrant.
-    fn is_high(&self) -> Result<bool, E> {
+    fn is_high(&mut self) -> Result<bool, E> {
         Ok(!self.is_low()?)
     }
 
     /// Read the state of the key at this row and column. Not reentrant.
-    fn is_low(&self) -> Result<bool, E> {
+    fn is_low(&mut self) -> Result<bool, E> {
         self.col.borrow_mut().set_low()?;
-        let out = self.row.is_low()?;
+        let out = self.row.borrow_mut().is_low()?;
         self.col.borrow_mut().set_high()?;
         Ok(out)
     }
@@ -343,13 +346,13 @@ macro_rules! keypad_struct {
             {
 
                 let rows: [
-                    &dyn $crate::embedded_hal::digital::v2::InputPin<Error = $error_type>;
+                    &$crate::_core::cell::RefCell<dyn $crate::embedded_hal::digital::InputPin<Error = $error_type>>;
                     keypad_struct!(@count $($row_type)*)
                 ]
                     = keypad_struct!(@tuple  self.rows,  ($($row_type),*));
 
                 let columns: [
-                    &$crate::_core::cell::RefCell<dyn $crate::embedded_hal::digital::v2::OutputPin<Error = $error_type>>;
+                    &$crate::_core::cell::RefCell<dyn $crate::embedded_hal::digital::OutputPin<Error = $error_type>>;
                     keypad_struct!(@count $($col_type)*)
                 ]
                     = keypad_struct!(@tuple  self.columns,  ($($col_type),*));

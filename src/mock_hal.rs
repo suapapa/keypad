@@ -61,7 +61,7 @@ macro_rules! gpio {
         pub mod $port {
             use super::{State, Input,Output, Floating, PushPull, OpenDrain, GpioExt, PullUp, $PORT};
             use core::marker::PhantomData;
-            use embedded_hal::digital::v2::{InputPin, OutputPin};
+            use embedded_hal::digital::{ErrorType, InputPin, OutputPin};
 
             /// The pins of a mock GPIO port
             #[derive(Debug)]
@@ -152,8 +152,11 @@ macro_rules! gpio {
                     }
                 }
 
-                impl OutputPin for $Pin<Output<PushPull>> {
+                impl ErrorType for $Pin<Output<PushPull>> {
                     type Error = core::convert::Infallible;
+                }
+
+                impl OutputPin for $Pin<Output<PushPull>> {
                     /// Drive the mock pin high.
                     fn set_high(&mut self) -> Result<(), Self::Error> {
                         Ok(self.state = State::High)
@@ -164,8 +167,11 @@ macro_rules! gpio {
                     }
                 }
 
-                impl OutputPin for $Pin<Output<OpenDrain>> {
+                impl ErrorType for $Pin<Output<OpenDrain>> {
                     type Error = core::convert::Infallible;
+                }
+
+                impl OutputPin for $Pin<Output<OpenDrain>> {
                     /// Leave the mock pin floating.
                     fn set_high(&mut self) -> Result<(), Self::Error> {
                         Ok(self.state = State::Float)
@@ -177,14 +183,17 @@ macro_rules! gpio {
                     }
                 }
 
-                impl<MODE> InputPin for $Pin<Input<MODE>> {
+                impl<MODE> ErrorType  for $Pin<Input<MODE>> {
                     type Error = core::convert::Infallible;
+                }
+
+                impl<MODE> InputPin for $Pin<Input<MODE>> {
                     /// Is the mock input pin high? Panic if it's floating.
-                    fn is_high(&self) -> Result<bool,Self::Error> {
+                    fn is_high(&mut self) -> Result<bool,Self::Error> {
                         Ok(!self.is_low()?)
                     }
                     /// Is the mock input pin low? Panic if it's floating.
-                    fn is_low(&self) -> Result<bool, Self::Error> {
+                    fn is_low(&mut self) -> Result<bool, Self::Error> {
                         match self.state {
                             State::Low => Ok(true),
                             State::High => Ok(false),

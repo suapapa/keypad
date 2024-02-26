@@ -5,7 +5,7 @@
 //! won't do anything interesting because there are no real buttons to press.
 
 use core::convert::Infallible;
-use embedded_hal::digital::v2::InputPin;
+use embedded_hal::digital::InputPin;
 use keypad::mock_hal::{self, GpioExt, Input, OpenDrain, Output, PullUp, GPIOA};
 use keypad::{keypad_new, keypad_struct};
 
