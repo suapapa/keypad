@@ -140,9 +140,8 @@ pub extern crate embedded_hal;
 #[doc(hidden)]
 pub extern crate core as _core;
 
-pub mod mock_hal;
+// pub mod mock_hal;
 
-use core::cell::RefCell;
 use embedded_hal::digital::{ErrorType, InputPin, OutputPin};
 
 /// A virtual `embedded-hal` input pin representing one key of the keypad.
@@ -164,15 +163,15 @@ use embedded_hal::digital::{ErrorType, InputPin, OutputPin};
 /// 2) Reading from a `KeypadInput` is slower than reading from a real input
 /// pin, because it needs to change the output pin state twice for every read.
 pub struct KeypadInput<'a, E> {
-    row: &'a RefCell<dyn InputPin<Error = E>>,
-    col: &'a RefCell<dyn OutputPin<Error = E>>,
+    row: &'a mut dyn InputPin<Error = E>,
+    col: &'a mut dyn OutputPin<Error = E>,
 }
 
 impl<'a, E> KeypadInput<'a, E> {
     /// Create a new `KeypadInput`. For use in macros.
     pub fn new(
-        row: &'a RefCell<dyn InputPin<Error = E>>,
-        col: &'a RefCell<dyn OutputPin<Error = E>>,
+        row: &'a mut dyn InputPin<Error = E>,
+        col: &'a mut dyn OutputPin<Error = E>,
     ) -> Self {
         Self { row, col }
     }
@@ -190,9 +189,9 @@ impl<'a, E: embedded_hal::digital::Error> InputPin for KeypadInput<'a, E> {
 
     /// Read the state of the key at this row and column. Not reentrant.
     fn is_low(&mut self) -> Result<bool, E> {
-        self.col.borrow_mut().set_low()?;
-        let out = self.row.borrow_mut().is_low()?;
-        self.col.borrow_mut().set_high()?;
+        self.col.set_low()?;
+        let out = self.row.is_low()?;
+        self.col.set_high()?;
         Ok(out)
     }
 }
@@ -329,7 +328,7 @@ macro_rules! keypad_struct {
             /// only have shared/immutable reference to them. This lets us
             /// actively scan the matrix when reading the state of a virtual
             /// `KeypadInput` pin.
-            columns: ($($crate::_core::cell::RefCell<$col_type>),* ,),
+            columns: ($($col_type),* ,),
         }
 
         impl $struct_name {
@@ -341,18 +340,18 @@ macro_rules! keypad_struct {
                     @array2d_type
                         $crate::KeypadInput<'a, $error_type>,
                         ($($row_type),*)
-                        ($($crate::_core::cell::RefCell<$col_type>),*)
+                        ($($col_type),*)
                 )
             {
 
                 let rows: [
-                    &$crate::_core::cell::RefCell<dyn $crate::embedded_hal::digital::InputPin<Error = $error_type>>;
+                    &mut dyn $crate::embedded_hal::digital::InputPin<Error = $error_type>;
                     keypad_struct!(@count $($row_type)*)
                 ]
                     = keypad_struct!(@tuple  self.rows,  ($($row_type),*));
 
                 let columns: [
-                    &$crate::_core::cell::RefCell<dyn $crate::embedded_hal::digital::OutputPin<Error = $error_type>>;
+                    &mut dyn $crate::embedded_hal::digital::OutputPin<Error = $error_type>;
                     keypad_struct!(@count $($col_type)*)
                 ]
                     = keypad_struct!(@tuple  self.columns,  ($($col_type),*));
@@ -362,7 +361,7 @@ macro_rules! keypad_struct {
                     @array2d_type
                         $crate::_core::mem::MaybeUninit<$crate::KeypadInput<'a, $error_type>>,
                         ($($row_type),*)
-                        ($($crate::_core::cell::RefCell<$col_type>),*)
+                        ($($col_type),*)
                 ) = unsafe {
                     $crate::_core::mem::MaybeUninit::uninit().assume_init()
                 };
@@ -387,7 +386,7 @@ macro_rules! keypad_struct {
             /// macros are hard). You can use `.into_inner()` to extract
             /// each column pin from its `RefCell`.
             #[allow(dead_code)]
-            $visibility fn release(self) ->(($($row_type),* ,), ($($crate::_core::cell::RefCell<$col_type>),* ,)) {
+            $visibility fn release(self) ->(($($row_type),* ,), ($($col_type),* ,)) {
                 (self.rows, self.columns)
             }
         }
@@ -491,7 +490,7 @@ macro_rules! keypad_new {
     }) => {
         $struct_name {
             rows:  ($($row_val),* ,),
-            columns:  ($($crate::_core::cell::RefCell::new($col_val)),* ,),
+            columns:  ($($col_val),* ,),
         }
     };
 }
